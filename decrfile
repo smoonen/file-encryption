@@ -1,0 +1,35 @@
+#!/bin/bash
+
+# Decrypt a single file (specified as first parameter) to stdout that was encrypted using encrfile.
+# Public key cryptography is not suitable for processing large files.
+# So we use AES256 for file encryption and RSA to encrypt the AES256 keys.
+
+if [ $# -ne 1 ]
+then
+  echo "Decrypt file using a private key in the current directory, and dump to stdout"
+  echo
+  echo "Usage:"
+  echo "  $0 file.enc"
+  echo
+  exit 0
+fi
+
+# We may have multiple private key files, some of which are older/retired (privkey*.pem).
+# Loop through the private key files and try decrypting the encrypted AES256 keys.
+# Stop when we are able to successfully decrypt.
+
+for privkeyfile in privkey*.pem
+do
+  # Decrypt the encrypted AES256 passphrase that we stored in the first line of the file.
+  PASSPHRASE=`head -2 "$1" | tail -1 | base64 -d | openssl pkeyutl -decrypt -inkey $privkeyfile 2> /dev/null`
+
+  if [ $? -eq 0 ]
+  then
+    break
+  fi
+done
+export PASSPHRASE
+
+# Decrypt the file itself using the AES256 passphrase.
+tail -n +3 "$1" | openssl enc -d -aes-256-cbc -pass env:PASSPHRASE
+

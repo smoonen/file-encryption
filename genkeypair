@@ -1,0 +1,16 @@
+#!/bin/bash
+
+# One time script to generate a private and public key pair
+
+if [ -e privkey.pem ] || [ -e pubkey.pem ]
+then
+  echo "Please remove existing key files before generating a key pair"
+  exit 1
+fi
+
+# Generate private key
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out privkey.pem
+
+# Extract public key from private key
+openssl pkey -in privkey.pem -pubout -out pubkey.pem
+

@@ -1,0 +1,40 @@
+#!/bin/bash
+
+# Encrypt one or more files, specified as parameters.
+# Public key cryptography is not suitable for processing large files.
+# So we use AES256 for file encryption and RSA to encrypt randomly generated AES256 passphrases.
+
+# The encrypted file is saved with a .enc extension.
+# The first line of this file is explanatory text.
+# The second line of this file is the base64 encoding of the encrypted AES256 passphrase.
+# The remainder of this file is the encrypted file contents.
+
+if [ $# -lt 1 ]
+then
+  echo "Encrypt one or more files using a public key in the current directory"
+  echo
+  echo "Usage:"
+  echo "  $0 file1 [file2 ...]"
+  echo
+  exit 0
+fi
+
+# Note that we actually generate a passphrase here rather than a key.
+# This allows us to keep the key/passphrase out of command line parameters and pass it via stdin.
+# Since the key and IV are derived from the passphrase, give it extra material (128 bytes rather than 32).
+# Convert it to base64 so that it can be more predictably parsed on stdin (no newlines).
+PASSPHRASE=`openssl rand 128 | base64 -w 0`
+
+for file in "$@"
+do
+  # Explanatory header
+  echo "This file is encrypted. For more information, see https://github.com/smoonen/file-encryption/." > "$file.enc"
+
+  # Encrypt file-specific encryption passphrase with public key
+  echo $PASSPHRASE | openssl pkeyutl -encrypt -pubin -inkey pubkey.pem | base64 -w 0 >> "$file.enc"
+  echo >> "$file.enc"
+
+  # Encrypt file
+  echo $PASSPHRASE | openssl enc -aes-256-cbc -pass stdin -in $file >> "$file.enc"
+done
+
